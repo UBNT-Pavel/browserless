@@ -38,7 +38,7 @@
     "http-proxy": "^1.16.2",
     "joi": "^13.3.0",
     "lodash": "^4.17.4",
-    "puppeteer": "^1.5.0",
+    "puppeteer": "1.5.0",
     "queue": "^4.4.2",
     "request": "^2.83.0",
     "require-from-string": "^2.0.2",
