@@ -15,6 +15,7 @@ const oneMinute = 60 * 1000;
 
 const sysdebug = getDebug('system');
 const jobdebug = getDebug('job');
+const jobdetaildebug = getDebug('jobdetail');
 
 export class ChromeService {
   private readonly server: BrowserlessServer;
@@ -91,10 +92,13 @@ export class ChromeService {
     return Promise.resolve();
   }
 
-  public async runHTTP({ code, context, req, res }) {
+  public async runHTTP(
+    { code, context, req, res, detached = false }:
+    { code: any; context: any; req: any; res: any; detached?: boolean; },
+  ) {
     const jobId = id();
 
-    jobdebug(`${jobId}: ${req.url}: Inbound WebSocket request.`);
+    jobdebug(`${jobId}: ${req.url}: Inbound HTTP request.`);
 
     if (this.config.demoMode) {
       jobdebug(`${jobId}: Running in demo-mode, closing with 403.`);
@@ -112,8 +116,23 @@ export class ChromeService {
       // Don't return
     }
 
-    const vm = new NodeVM();
-    const handler: (args) => Promise<any> = vm.run(code);
+    if (detached) {
+      jobdebug(`${jobId}: Function is detached, resolving request.`);
+      res.json({ id: jobId });
+    }
+
+    const vm = new NodeVM({
+      require: {
+        builtin: this.config.functionBuiltIns,
+        external: this.config.functionExternals,
+        root: './',
+      },
+    });
+    const handler: (args) => Promise<any> = vm.run(code, `browserless-function-${jobId}.js`);
+    const earlyClose = () => {
+      jobdebug(`${job.id}: Function terminated prior to execution removing from queue`);
+      this.removeJob(job);
+    };
 
     const job: IJob = Object.assign(
       (done: () => {}) => {
@@ -126,7 +145,7 @@ export class ChromeService {
         this.getChrome(flags).then(async (browser) => {
           const page = await browser.newPage();
 
-          jobdebug(`${job.id}: Executing function: ${JSON.stringify({ code, context })}`);
+          jobdetaildebug(`${job.id}: Executing function: ${JSON.stringify({ code, context })}`);
           job.browser = browser;
 
           req.removeListener('close', earlyClose);
@@ -136,9 +155,16 @@ export class ChromeService {
           });
 
           Promise.resolve(handler({ page, context }))
-            .then(({ data, type }) => {
+            .then(({ data, type = 'text/plain' } = {}) => {
               jobdebug(`${job.id}: Function complete, cleaning up.`);
-              res.type(type || 'text/plain');
+
+              // If we've already responded (detached)
+              // Then call done and return
+              if (res.headersSent) {
+                return done();
+              }
+
+              res.type(type);
 
               if (Buffer.isBuffer(data)) {
                 res.end(data, 'binary');
@@ -148,10 +174,12 @@ export class ChromeService {
                 res.send(data);
               }
 
-              done();
+              return done();
             })
             .catch((error) => {
-              res.status(500).send(error.message);
+              if (!res.headersSent) {
+                res.status(500).send(error.message);
+              }
               jobdebug(`${job.id}: Function errored, stopping Chrome`);
               done();
             });
@@ -163,11 +191,6 @@ export class ChromeService {
         id: jobId,
       },
     );
-
-    const earlyClose = () => {
-      jobdebug(`${job.id}: Function terminated prior to execution removing from queue`);
-      this.removeJob(job);
-    };
 
     req.once('close', earlyClose);
     this.addJob(job);
