@@ -2,6 +2,7 @@
   "name": "browserless-chrome",
   "version": "1.0.0-alpha",
   "description": "Chrome-as-a-service on your own hardware or in the cloud.",
+  "repository": "joelgriffith/browserless",
   "main": "build/index.js",
   "files": [
     "build/main.css",
@@ -18,13 +19,23 @@
     "test": "jest --forceExit",
     "prepush": "npm run lint && npm test"
   },
-  "puppeteerVersions": [
-    "1.0.0",
-    "1.1.1",
-    "1.2.0",
-    "1.3.0",
-    "1.4.0",
-    "1.5.0"
+  "puppeteerVersions": {
+    "puppeteer-1.0.0": "1.0.0",
+    "puppeteer-1.1.1": "1.1.1",
+    "puppeteer-1.2.0": "1.2.0",
+    "puppeteer-1.3.0": "1.3.0",
+    "puppeteer-1.4.0": "1.4.0",
+    "puppeteer-1.5.0": "1.5.0",
+    "chrome-stable": "1.4.0"
+  },
+  "releaseBranches": [
+    "puppeteer-1.0.0",
+    "puppeteer-1.1.1",
+    "puppeteer-1.2.0",
+    "puppeteer-1.3.0",
+    "puppeteer-1.4.0",
+    "puppeteer-1.5.0",
+    "chrome-stable"
   ],
   "author": "jgriffith",
   "license": "GPL-3.0",

@@ -3,9 +3,12 @@ const child = require('child_process');
 const util = require('util');
 const exec = util.promisify(child.exec);
 
-const getMeta = require('./get-meta');
-const { puppeteerVersions } = require('../package.json');
+const {
+  releaseBranches,
+  puppeteerVersions,
+} = require('../package.json');
 
+const DEFAULT_PUPPETEER_VERSION = '1.4.0';
 const DEPLOY_BRANCH = 'master';
 const metaFiles = [
   'package.json',
@@ -25,14 +28,17 @@ const logExec = (cmd) => {
   });
 };
 
-const deployPuppeteerVersion = async (version) => {
-  console.log(`>>> Deploying ${version} of puppeteer`);
-  await logExec(`git checkout puppeteer-${version} --quiet`);
+const deployPuppeteerVersion = async (branch) => {
+  const version = puppeteerVersions[branch];
+
+  console.log(`>>> Deploying release ${branch} of browserless, puppeteer@${version}`);
+
+  await logExec(`git checkout ${branch} --quiet`);
   await logExec(`git merge ${DEPLOY_BRANCH} --strategy-option theirs --commit --quiet`);
   await logExec(`rm -rf node_modules package-lock.json`);
   await logExec(`npm install --silent`);
   await logExec(`npm install --silent --save --save-exact puppeteer@${version}`);
-  await logExec(`npm run meta --silent`);
+  await logExec(`npm run meta --silent ${version.includes('chrome-stable') ? '-- --chrome-stable' : ''}`);
 
   for (let file of metaFiles) {
     try {
@@ -45,7 +51,7 @@ const deployPuppeteerVersion = async (version) => {
     }
   }
 
-  await logExec(`git push origin puppeteer-${version} --quiet --no-verify`);
+  await logExec(`git push origin ${version} --quiet --no-verify`);
 }
 
 async function deploy () {
@@ -63,7 +69,7 @@ async function deploy () {
 
   console.log(`>>> On branch ${DEPLOY_BRANCH} and no untracked files in git, proceeding...`);
 
-  puppeteerVersions.reduce((lastJob, puppeteerVersion) => 
+  releaseBranches.reduce((lastJob, puppeteerVersion) => 
     lastJob.then(() => deployPuppeteerVersion(puppeteerVersion)), Promise.resolve());
 }
 
