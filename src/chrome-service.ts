@@ -156,9 +156,17 @@ export class ChromeService {
 
         this.getChrome(flags)
           .then(async (browser) => {
+            jobdetaildebug(`${job.id}: Executing function.`);
             const page = await browser.newPage();
 
-            jobdetaildebug(`${job.id}: Executing function.`);
+            page.on('error', (error) => {
+              jobdebug(`${job.id}: Error on page: ${error.message}`);
+              if (!res.headersSent) {
+                res.status(500).send(error.message);
+              }
+              done();
+            });
+
             job.browser = browser;
 
             req.removeListener('close', earlyClose);
